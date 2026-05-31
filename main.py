@@ -4,19 +4,24 @@ import streamlit as st
 st.set_page_config(page_title="ActivoPay Gestor", layout="wide")
 
 # 2. Inicialización de la conexión
-conn = st.connection("postgresql", type="sql")
+# Asegúrate de que en 'Secrets' la URL tenga el puerto 6543
+try:
+    conn = st.connection("postgresql", type="sql")
+except Exception as e:
+    st.error(f"Error al iniciar conexión: {e}")
+    st.stop()
 
 st.title("🚀 Gestión ActivoPay")
 
-# 3. Sidebar para Navegación
+# 3. Navegación
 menu = st.sidebar.selectbox("Menú Principal", ["Dashboard", "Mis Clientes", "Carga Masiva"])
 
 # 4. Lógica del Dashboard
 if menu == "Dashboard":
     st.subheader("Reporte de Gestión")
     try:
-        # CORRECCIÓN: Pasar la consulta como string puro, sin text()
-        df = conn.query("SELECT * FROM empresas LIMIT 10;", ttl=600)
+        # Consulta SQL como string simple
+        df = conn.query("SELECT * FROM empresas LIMIT 10;")
         st.write("Resumen de Clientes:", df)
     except Exception as e:
         st.error(f"Error al cargar datos: {e}")

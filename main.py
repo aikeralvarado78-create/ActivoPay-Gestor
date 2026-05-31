@@ -1,38 +1,33 @@
 import streamlit as st
-import pandas as pd
-# from database import session, Empresa, Gestion # Aquí importarás tus conexiones
+
+# 1. Configuración de la conexión
+# Esto buscará automáticamente el URL que guardaste en los 'Secrets'
+conn = st.connection("postgresql", type="sql")
 
 st.set_page_config(page_title="ActivoPay Gestor", layout="wide")
 
 st.title("🚀 Gestión ActivoPay")
 
-# 1. Sidebar para Navegación
+# 2. Sidebar para Navegación
 menu = st.sidebar.selectbox("Menú Principal", ["Dashboard", "Mis Clientes", "Carga Masiva"])
 
 if menu == "Dashboard":
     st.subheader("Reporte de Gestión")
-    # Aquí irán los gráficos y KPIs
-    st.write("Visualización de KPIs en tiempo real...")
+    # Ejemplo de cómo consultar datos de tu BD
+    try:
+        # Reemplaza 'empresas' por el nombre de tu tabla real
+        df = conn.query("SELECT * FROM empresas LIMIT 10;")
+        st.write("Resumen de Clientes:", df)
+    except Exception as e:
+        st.error(f"Error al cargar datos: {e}")
 
 elif menu == "Mis Clientes":
     st.subheader("Mis Clientes y Chat")
-    # Tabla de clientes
-    # Al seleccionar un cliente, se debe desplegar el historial de mensajes
-    st.write("Selecciona un cliente para ver su historial y estado.")
+    # Aquí consultarías tu tabla de clientes
+    st.write("Selecciona un cliente para ver su historial.")
 
 elif menu == "Carga Masiva":
     st.subheader("Carga de Nuevos Clientes")
     uploaded_file = st.file_uploader("Cargar Excel", type=["xlsx"])
     if uploaded_file:
-        # Aquí llamaríamos a la función de migración que documentamos
-        st.success("Archivo procesado. Verificando duplicados...")
-
-# 2. Lógica del Chat (Ejemplo conceptual)
-def renderizar_chat(id_gestion):
-    st.write("---")
-    st.subheader("Historial de Comunicación")
-    # Aquí consultaríamos la tabla Historial_Mensajes
-    mensaje = st.text_input("Enviar observación al equipo...")
-    if st.button("Enviar"):
-        # Lógica para guardar en la BD
-        st.write("Mensaje enviado al equipo administrativo.")
+        st.success("Archivo subido. Procesando integración...")

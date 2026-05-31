@@ -1,6 +1,6 @@
 import streamlit as st
 
-# Configuración inicial
+# Configuración de página
 st.set_page_config(page_title="ActivoPay Gestor", layout="wide")
 
 # Inicialización de conexión
@@ -12,13 +12,14 @@ menu = st.sidebar.selectbox("Menú Principal", ["Dashboard", "Mis Clientes", "Ca
 
 if menu == "Dashboard":
     st.subheader("Reporte de Gestión")
+    # Consulta de prueba para verificar si el servidor responde
     try:
-        # Usamos el string plano para evitar errores de hashing
-        # La IP forzada en secrets resolverá el problema de conexión
-        df = conn.query("SELECT * FROM empresas LIMIT 10;")
-        st.write("Resumen de Clientes:", df)
+        with st.spinner("Conectando y probando base de datos..."):
+            df = conn.query("SELECT 1 as test_conexion;")
+            st.success("¡Conexión establecida! Servidor responde correctamente.")
+            st.write("Resultado de prueba:", df)
     except Exception as e:
-        st.error(f"Error técnico al cargar: {e}")
+        st.error(f"Error al conectar: {e}")
 
 elif menu == "Mis Clientes":
     st.subheader("Mis Clientes y Chat")

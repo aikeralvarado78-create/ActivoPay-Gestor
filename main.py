@@ -3,14 +3,11 @@ import pandas as pd
 import socket
 from sqlalchemy import create_engine, text
 
-# 1. Configuración de Red: Fuerza IPv4 para evitar conflictos en Streamlit Cloud
+# 1. Configuración: Fuerza IPv4 para compatibilidad en red
 socket.AF_INET = socket.AF_INET
-
-# Configuración de página
 st.set_page_config(page_title="ActivoPay Pro", layout="wide")
 
-# Inicialización del motor de conexión usando SQLALchemy
-# Asegúrate de tener la URL en tus Secrets: [connections.postgresql] url = "..."
+# Inicialización del motor de conexión (Secretos gestionados en Streamlit Cloud)
 try:
     url_db = st.secrets["connections"]["postgresql"]["url"]
     engine = create_engine(url_db)
@@ -20,7 +17,9 @@ except Exception as e:
 
 st.title("🚀 Gestión ActivoPay: Ecosistema Digital")
 
-# Módulo de Validación de Inmutabilidad (Regla de negocio: Cero duplicados)
+# --- Módulos de Soporte ---
+
+# Regla de Inmutabilidad: Evita duplicados críticos
 def validar_duplicado(rif, telefono, ci):
     with engine.connect() as conn:
         query = text("""
@@ -32,6 +31,8 @@ def validar_duplicado(rif, telefono, ci):
 
 # 2. Sidebar de Navegación (Flujo de Trabajo)
 menu = st.sidebar.selectbox("Módulo Funcional", ["Dashboard", "Registro", "Gestión Técnica", "Chat de Trazabilidad", "Carga Masiva"])
+
+# --- Ejecución de Módulos ---
 
 # Módulo Analítico (KPIs para Junta Directiva)
 if menu == "Dashboard":
@@ -56,16 +57,15 @@ elif menu == "Registro":
         
         if submit:
             if validar_duplicado(rif, telefono, ci):
-                st.error("Error: Conflicto de datos (RIF, Teléfono o Cédula duplicados). Contacte al responsable del registro.")
+                st.error("Error: Conflicto de datos. El registro ya existe.")
             else:
                 with engine.connect() as conn:
-                    # Inserción atómica en entidades relacionadas
                     conn.execute(text("INSERT INTO empresas (rif, nombre, telefono) VALUES (:rif, :n, :t)"), 
                                  {"rif": rif, "n": nombre, "t": telefono})
                     conn.execute(text("INSERT INTO gestion (empresa_rif, estatus) VALUES (:rif, 'Pendiente')"), 
                                  {"rif": rif})
                     conn.commit()
-                st.success("Cliente registrado con éxito y asignado a Gestión.")
+                st.success("Cliente registrado con éxito.")
 
 # Módulo de Gestión (Transiciones de Estado)
 elif menu == "Gestión Técnica":
@@ -85,7 +85,7 @@ elif menu == "Gestión Técnica":
             conn.commit()
         st.success("Estado actualizado.")
 
-# Módulo de Colaboración (Chat de Trazabilidad)
+# Módulo de Trazabilidad (Chat)
 elif menu == "Chat de Trazabilidad":
     st.subheader("Historial de Mensajes y Observaciones")
     id_g = st.text_input("ID de Gestión")
@@ -101,14 +101,20 @@ elif menu == "Chat de Trazabilidad":
                 conn.commit()
             st.rerun()
 
-# Módulo de Migración (Carga Masiva)
+# Módulo de Migración (Carga Masiva - Normalización)
 elif menu == "Carga Masiva":
-    st.subheader("Migración de Datos")
+    st.subheader("Migración de Datos Históricos")
     uploaded_file = st.file_uploader("Cargar Excel Histórico", type=["xlsx"])
     if uploaded_file:
         df = pd.read_excel(uploaded_file)
-        st.write("Vista previa:", df.head())
         if st.button("Normalizar y Migrar"):
-            # Aquí aplicarías la lógica de desanidación de usuarios
-            df.to_sql('empresas', engine, if_exists='append', index=False)
-            st.success("Migración completada con éxito.")
+            try:
+                with engine.begin() as conn:
+                    for _, row in df.iterrows():
+                        conn.execute(text("INSERT INTO empresas (rif, nombre, telefono) VALUES (:rif, :nom, :tel) ON CONFLICT DO NOTHING"), 
+                                     {"rif": row['RIF'], "nom": row['Nombre'], "tel": row['Telefono']})
+                        conn.execute(text("INSERT INTO gestion (empresa_rif, estatus) VALUES (:rif, 'En Producción') ON CONFLICT DO NOTHING"), 
+                                     {"rif": row['RIF']})
+                st.success("Migración finalizada con éxito.")
+            except Exception as e:
+                st.error(f"Error en migración: {e}")

@@ -1,8 +1,15 @@
 import streamlit as st
 
-# 1. Configuración de la conexión
-# Esto buscará automáticamente el URL que guardaste en los 'Secrets'
+# La conexión buscará automáticamente el puerto 6543 que pusimos en los Secrets
 conn = st.connection("postgresql", type="sql")
+
+# Prueba la conexión
+try:
+    with conn.session as s:
+        s.execute("SELECT 1")
+    st.success("¡Conexión establecida exitosamente!")
+except Exception as e:
+    st.error(f"Error técnico de conexión: {e}")
 
 st.set_page_config(page_title="ActivoPay Gestor", layout="wide")
 

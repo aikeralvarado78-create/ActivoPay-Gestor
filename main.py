@@ -1,54 +1,59 @@
 import streamlit as st
 import pandas as pd
-import socket
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 
-# FORZAR IPv4: Esto evita el error "Cannot assign requested address"
-socket.AF_INET = socket.AF_INET
+# Configuración
+st.set_page_config(page_title="ActivoPay Pro", layout="wide")
+url_db = st.secrets["connections"]["postgresql"]["url"]
+engine = create_engine(url_db)
 
-# 1. Configuración de página
-st.set_page_config(page_title="ActivoPay Gestor", layout="wide")
+st.title("🚀 ActivoPay: Ecosistema Digital")
 
-# 2. Configuración de motor de base de datos
-try:
-    # Asegúrate de que el nombre del secreto coincida exactamente con lo que pongas en los settings
-    url_db = st.secrets["connections"]["postgresql"]["url"]
-    engine = create_engine(url_db)
-except Exception as e:
-    engine = None
-    st.sidebar.error("Error de configuración de conexión.")
+# Módulo de Validación de Inmutabilidad
+def validar_duplicado(rif, telefono, ci):
+    with engine.connect() as conn:
+        check = conn.execute(text(
+            "SELECT 'empresa' FROM empresas WHERE rif = :rif OR telefono = :tel "
+            "UNION SELECT 'usuario' FROM usuarios WHERE ci = :ci"
+        ), {"rif": rif, "tel": telefono, "ci": ci}).fetchone()
+        return check is not None
 
-st.title("🚀 Gestión ActivoPay")
+menu = st.sidebar.selectbox("Módulo", ["Dashboard", "Registro", "Gestión Técnica", "Chat"])
 
-menu = st.sidebar.selectbox("Menú Principal", ["Dashboard", "Mis Clientes", "Carga Masiva"])
-
-# 3. Lógica del Dashboard
-if menu == "Dashboard":
-    st.subheader("Reporte de Gestión")
-    if engine:
-        try:
-            df = pd.read_sql("SELECT * FROM clientes", engine)
-            st.write("Base de datos de Clientes:", df)
-        except Exception as e:
-            st.info("Aún no hay datos guardados o la tabla no existe.")
-    else:
-        st.error("No se pudo conectar a la base de datos.")
-
-# 4. Lógica de Carga Masiva
-elif menu == "Carga Masiva":
-    st.subheader("Carga de Nuevos Clientes")
-    uploaded_file = st.file_uploader("Cargar Excel", type=["xlsx"])
-    
-    if uploaded_file:
-        df = pd.read_excel(uploaded_file)
-        st.write("Vista previa:", df.head())
+# Módulo de Registro (Ingesta)
+if menu == "Registro":
+    st.subheader("Registro de Nuevo Cliente")
+    with st.form("registro_form"):
+        rif = st.text_input("RIF")
+        nombre = st.text_input("Nombre Empresa")
+        telefono = st.text_input("Teléfono")
+        ci = st.text_input("Cédula Representante")
+        submit = st.form_submit_button("Registrar")
         
-        if st.button("Guardar en Base de Datos"):
-            if engine:
-                try:
-                    df.to_sql('clientes', engine, if_exists='append', index=False)
-                    st.success("¡Datos guardados permanentemente!")
-                except Exception as e:
-                    st.error(f"Error al guardar: {e}")
+        if submit:
+            if validar_duplicado(rif, telefono, ci):
+                st.error("Error: Conflicto de datos (RIF, Teléfono o Cédula ya existen).")
             else:
-                st.error("No hay conexión activa.")
+                with engine.connect() as conn:
+                    conn.execute(text("INSERT INTO empresas (rif, nombre, telefono) VALUES (:rif, :n, :t)"), 
+                                 {"rif": rif, "n": nombre, "t": telefono})
+                    conn.execute(text("INSERT INTO gestion (empresa_rif, estatus) VALUES (:rif, 'Pendiente')"), 
+                                 {"rif": rif})
+                    conn.commit()
+                st.success("Cliente registrado correctamente.")
+
+# Módulo de Gestión (Administrativa)
+elif menu == "Gestión Técnica":
+    st.subheader("Control de Afiliación")
+    with engine.connect() as conn:
+        data = pd.read_sql("SELECT * FROM gestion", conn)
+    
+    st.table(data)
+    id_g = st.number_input("ID Gestión a procesar", min_value=1)
+    accion = st.selectbox("Cambiar Estatus", ["Pendiente", "Aprobado", "Rechazado", "En Producción"])
+    
+    if st.button("Actualizar Estatus"):
+        with engine.connect() as conn:
+            conn.execute(text("UPDATE gestion SET estatus = :s WHERE id_gestion = :id"), {"s": accion, "id": id_g})
+            conn.commit()
+        st.experimental_rerun()

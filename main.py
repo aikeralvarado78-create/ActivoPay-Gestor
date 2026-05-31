@@ -26,7 +26,7 @@ elif menu == "Carga Masiva":
     
     if uploaded_file:
         try:
-            # Leemos el archivo Excel con pandas
+            # Leemos el archivo Excel con pandas (ahora con openpyxl instalado)
             df = pd.read_excel(uploaded_file)
             st.success("¡Archivo cargado con éxito!")
             st.write("Vista previa de los datos:")
